@@ -310,7 +310,7 @@ final class HTTP3StreamHandler<Delegate: HTTP3StreamDelegate, ConnectionDelegate
 
     /// Write any pending bytes.
     private func emitPendingBytes(context: ChannelHandlerContext) {
-        if let bytes = self.pendingBytes.take() {
+        if let bytes = self.pendingBytes.take(), bytes.readableBytes > 0 {
             let promise = self.pendingPromise.take()
             context.write(HTTP3StreamHandler.wrapOutboundOut(bytes), promise: promise)
         }
