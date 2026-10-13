@@ -435,6 +435,32 @@ struct NIOHTTP3StreamHandlerTests {
     }
 
     @available(anyAppleOS 26.0, *)
+    @Test func rejectedWriteDoesNotFlushEmptyBuffer() throws {
+        let handler = HTTP3StreamHandler(
+            stateMachine: .init(streamType: .request, incoming: true, preferHuffmanEncoding: false),
+            streamID: 0,
+            streamType: .request,
+            qpackCoder: makeTestQPACKCoder(),
+            delegate: TestDelegate(),
+            logger: self.logger
+        )
+        let eventLoop = EmbeddedEventLoop()
+        let errorPromise = eventLoop.makePromise(of: (any Error).self)
+        let errorRecorder = InboundErrorRecorder(errorPromise: errorPromise)
+
+        let channel = EmbeddedChannel(handlers: [handler, errorRecorder], loop: eventLoop)
+
+        channel.pipeline.fireErrorCaught(QUICStopSendingError(code: QUICApplicationErrorCode(0)!))
+        let writeFuture = channel.write(HTTP3Frame.data(ByteBuffer(string: "late")))
+        channel.flush()
+
+        #expect(throws: HTTP3Error.self) {
+            try writeFuture.wait()
+        }
+        #expect(try channel.readOutbound(as: ByteBuffer.self) == nil)
+    }
+
+    @available(anyAppleOS 26.0, *)
     @Test func connectionError() throws {
         let eventLoop = EmbeddedEventLoop()
         let connectionErrorPromise = eventLoop.makePromise(of: HTTP3Error.self)
